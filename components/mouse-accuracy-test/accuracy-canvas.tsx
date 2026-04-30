@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
 import { computeAccuracy, resampleByArcLength, triangleVertices } from "@/lib/mouse-accuracy-test/geometry"
 import type { AccuracyResult, DrawPoint, ShapeType } from "@/types/mouse-accuracy-test"
 
@@ -187,13 +186,6 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
     redraw(pts, res, shape)
   }
 
-  function handleReset() {
-    pointsRef.current = []
-    setResult(null)
-    setTooSmall(false)
-    redraw([], null, shape)
-  }
-
   return (
     <div className="flex flex-col items-center gap-0 p-6">
       <canvas
@@ -236,7 +228,6 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
               </span>
             </div>
 
-            <Button onClick={handleReset}>다시 시도</Button>
           </>
         )}
       </div>
