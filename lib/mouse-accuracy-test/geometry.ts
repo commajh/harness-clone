@@ -69,7 +69,9 @@ function computeSquareAccuracy(points: DrawPoint[], center: DrawPoint): Accuracy
     errorRatio:
       idealHalfSide === 0 ? 0 : clamp01(Math.abs(lInf[i] - idealHalfSide) / idealHalfSide),
   }))
-  const score = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio))) * 100
+  const accuracy = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio)))
+  const completeness = angularCoverage(points, center)
+  const score = accuracy * completeness * 100
   return { score, coloredPoints, idealSize: idealHalfSide }
 }
 
@@ -90,7 +92,9 @@ function computeTriangleAccuracy(points: DrawPoint[], center: DrawPoint): Accura
       errorRatio: circumradius === 0 ? 0 : clamp01(Math.abs(dists[i] - idealDist) / idealDist),
     }
   })
-  const score = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio))) * 100
+  const accuracy = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio)))
+  const completeness = angularCoverage(points, center)
+  const score = accuracy * completeness * 100
   return { score, coloredPoints, idealSize: circumradius }
 }
 
