@@ -78,6 +78,41 @@ function computeTriangleAccuracy(points: DrawPoint[], center: DrawPoint): Accura
   return { score, coloredPoints, idealSize: circumradius }
 }
 
+/**
+ * Resamples a polyline to n evenly-spaced points by arc length.
+ * Eliminates score bias from variable mouse speed — slow sections no longer
+ * dominate the mean errorRatio just because they have more raw samples.
+ */
+export function resampleByArcLength(points: DrawPoint[], n: number): DrawPoint[] {
+  if (points.length <= 2) return points
+
+  // Build cumulative arc-length table
+  const arcLen: number[] = [0]
+  for (let i = 1; i < points.length; i++) {
+    arcLen.push(arcLen[i - 1] + dist(points[i - 1], points[i]))
+  }
+  const totalLen = arcLen[arcLen.length - 1]
+  if (totalLen === 0) return points
+
+  const result: DrawPoint[] = []
+  const step = totalLen / (n - 1)
+  let j = 0
+
+  for (let i = 0; i < n; i++) {
+    const target = i * step
+    // Advance segment pointer until the next arc-length exceeds target
+    while (j < arcLen.length - 2 && arcLen[j + 1] < target) j++
+    const segLen = arcLen[j + 1] - arcLen[j]
+    const t = segLen === 0 ? 0 : (target - arcLen[j]) / segLen
+    result.push({
+      x: points[j].x + t * (points[j + 1].x - points[j].x),
+      y: points[j].y + t * (points[j + 1].y - points[j].y),
+    })
+  }
+
+  return result
+}
+
 export function computeAccuracy(
   points: DrawPoint[],
   center: DrawPoint,

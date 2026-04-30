@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { computeAccuracy } from "./geometry"
+import { computeAccuracy, resampleByArcLength } from "./geometry"
 import type { DrawPoint } from "@/types/mouse-accuracy-test"
 
 const CENTER: DrawPoint = { x: 200, y: 200 }
@@ -131,5 +131,68 @@ describe("computeAccuracy — triangle", () => {
       expect(p.errorRatio).toBeGreaterThanOrEqual(0)
       expect(p.errorRatio).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+describe("resampleByArcLength", () => {
+  it("직선 비균등 점들을 균등 간격으로 리샘플링한다", () => {
+    // 원래: 0, 1, 100 (비균등) → 리샘플 3개: 0, 50, 100 (균등)
+    const pts = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 100, y: 0 }]
+    const result = resampleByArcLength(pts, 3)
+    expect(result).toHaveLength(3)
+    expect(result[0].x).toBeCloseTo(0, 5)
+    expect(result[1].x).toBeCloseTo(50, 0)
+    expect(result[2].x).toBeCloseTo(100, 5)
+  })
+
+  it("완벽한 원을 비균등 샘플로 주면 균등 리샘플 후에도 score=100에 가깝다", () => {
+    const r = 100
+    const biasedPoints: DrawPoint[] = []
+    // 상반원: 촘촘하게 (30개)
+    for (let i = 0; i <= 30; i++) {
+      const a = (Math.PI * i) / 30
+      biasedPoints.push({ x: CENTER.x + r * Math.cos(a), y: CENTER.y + r * Math.sin(a) })
+    }
+    // 하반원: 성기게 (3개)
+    for (let i = 1; i <= 3; i++) {
+      const a = Math.PI + (Math.PI * i) / 3
+      biasedPoints.push({ x: CENTER.x + r * Math.cos(a), y: CENTER.y + r * Math.sin(a) })
+    }
+    const resampled = resampleByArcLength(biasedPoints, 200)
+    const result = computeAccuracy(resampled, CENTER, "circle")
+    expect(result.score).toBeGreaterThan(95)
+  })
+
+  it("정확한 구간 과다 샘플링으로 부풀려진 score를 리샘플링이 교정한다", () => {
+    // 상반원(정확, r=100): 30점 과다 샘플 → 오차 없는 점이 score를 지배
+    // 하반원(오차, r=70): 3점 과소 샘플 → 오차 구간이 score에 반영 안 됨
+    const biasedPoints: DrawPoint[] = []
+    for (let i = 0; i <= 30; i++) {
+      const a = (Math.PI * i) / 30
+      biasedPoints.push({ x: CENTER.x + 100 * Math.cos(a), y: CENTER.y + 100 * Math.sin(a) })
+    }
+    for (let i = 1; i <= 3; i++) {
+      const a = Math.PI + (Math.PI * i) / 3
+      biasedPoints.push({ x: CENTER.x + 70 * Math.cos(a), y: CENTER.y + 70 * Math.sin(a) })
+    }
+    const scoreBiased = computeAccuracy(biasedPoints, CENTER, "circle").score
+    const scoreResampled = computeAccuracy(resampleByArcLength(biasedPoints, 200), CENTER, "circle").score
+    // 과다 샘플된 정확 구간이 score를 부풀리므로, 리샘플 후 score가 낮아져야 함
+    expect(scoreBiased).toBeGreaterThan(scoreResampled)
+  })
+
+  it("점이 2개 이하면 그대로 반환한다", () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }]
+    expect(resampleByArcLength(pts, 100)).toEqual(pts)
+  })
+
+  it("리샘플 결과 개수가 요청한 n과 같다", () => {
+    const pts = [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 100, y: 0 }]
+    expect(resampleByArcLength(pts, 7)).toHaveLength(7)
+  })
+
+  it("총 호 길이가 0인 점들(모두 같은 위치)이면 그대로 반환한다", () => {
+    const pts = [{ x: 5, y: 5 }, { x: 5, y: 5 }, { x: 5, y: 5 }]
+    expect(resampleByArcLength(pts, 5)).toEqual(pts)
   })
 })
