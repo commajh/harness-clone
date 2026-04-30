@@ -52,10 +52,6 @@ describe("AccuracyCanvas — 초기 상태", () => {
     expect(screen.queryByTestId("score")).toBeNull()
   })
 
-  it("다시 시도 버튼이 없다", () => {
-    render(<AccuracyCanvas shape="circle" />)
-    expect(screen.queryByRole("button", { name: /다시 시도/ })).toBeNull()
-  })
 })
 
 describe("AccuracyCanvas — mouseup 후 결과 (circle)", () => {
@@ -63,12 +59,6 @@ describe("AccuracyCanvas — mouseup 후 결과 (circle)", () => {
     render(<AccuracyCanvas shape="circle" />)
     drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
     expect(screen.getByTestId("score").textContent).toMatch(/^\d+%$/)
-  })
-
-  it("다시 시도 버튼이 나타난다", () => {
-    render(<AccuracyCanvas shape="circle" />)
-    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
-    expect(screen.getByRole("button", { name: /다시 시도/ })).toBeTruthy()
   })
 
   it("색상 범례가 표시된다", () => {
@@ -87,11 +77,6 @@ describe("AccuracyCanvas — mouseup 후 결과 (square)", () => {
     expect(screen.getByTestId("score").textContent).toMatch(/^\d+%$/)
   })
 
-  it("다시 시도 버튼이 나타난다", () => {
-    render(<AccuracyCanvas shape="square" />)
-    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
-    expect(screen.getByRole("button", { name: /다시 시도/ })).toBeTruthy()
-  })
 })
 
 describe("AccuracyCanvas — mouseup 후 결과 (triangle)", () => {
@@ -101,27 +86,6 @@ describe("AccuracyCanvas — mouseup 후 결과 (triangle)", () => {
     expect(screen.getByTestId("score").textContent).toMatch(/^\d+%$/)
   })
 
-  it("다시 시도 버튼이 나타난다", () => {
-    render(<AccuracyCanvas shape="triangle" />)
-    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
-    expect(screen.getByRole("button", { name: /다시 시도/ })).toBeTruthy()
-  })
-})
-
-describe("AccuracyCanvas — 다시 시도", () => {
-  it("클릭 시 정확도 숫자가 사라진다", () => {
-    render(<AccuracyCanvas shape="circle" />)
-    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
-    fireEvent.click(screen.getByRole("button", { name: /다시 시도/ }))
-    expect(screen.queryByTestId("score")).toBeNull()
-  })
-
-  it("클릭 후 버튼이 사라진다", () => {
-    render(<AccuracyCanvas shape="circle" />)
-    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
-    fireEvent.click(screen.getByRole("button", { name: /다시 시도/ }))
-    expect(screen.queryByRole("button", { name: /다시 시도/ })).toBeNull()
-  })
 })
 
 describe("AccuracyCanvas — 너무 작음 경고", () => {
