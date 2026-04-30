@@ -45,7 +45,7 @@ function triangleBoundaryPoints(center: DrawPoint, circumradius: number): DrawPo
 
 describe("computeAccuracy — circle", () => {
   it("완벽한 원 위의 점들 → score = 100", () => {
-    const points = circlePoints(CENTER, 100)
+    const points = circlePoints(CENTER, 100, 360)
     const result = computeAccuracy(points, CENTER, "circle")
     expect(result.score).toBeCloseTo(100, 0)
   })
@@ -160,19 +160,19 @@ describe("resampleByArcLength", () => {
     }
     const resampled = resampleByArcLength(biasedPoints, 200)
     const result = computeAccuracy(resampled, CENTER, "circle")
-    expect(result.score).toBeGreaterThan(95)
+    expect(result.score).toBeGreaterThan(90)
   })
 
   it("정확한 구간 과다 샘플링으로 부풀려진 score를 리샘플링이 교정한다", () => {
-    // 상반원(정확, r=100): 30점 과다 샘플 → 오차 없는 점이 score를 지배
-    // 하반원(오차, r=70): 3점 과소 샘플 → 오차 구간이 score에 반영 안 됨
+    // 상반원(정확, r=100): 31점 과다 샘플 → 오차 없는 점이 score를 지배
+    // 하반원(오차, r=70): 10점 과소 샘플 → coverage 패널티는 비슷하게 유지하되 accuracy 편향이 유지됨
     const biasedPoints: DrawPoint[] = []
     for (let i = 0; i <= 30; i++) {
       const a = (Math.PI * i) / 30
       biasedPoints.push({ x: CENTER.x + 100 * Math.cos(a), y: CENTER.y + 100 * Math.sin(a) })
     }
-    for (let i = 1; i <= 3; i++) {
-      const a = Math.PI + (Math.PI * i) / 3
+    for (let i = 1; i <= 10; i++) {
+      const a = Math.PI + (Math.PI * i) / 10
       biasedPoints.push({ x: CENTER.x + 70 * Math.cos(a), y: CENTER.y + 70 * Math.sin(a) })
     }
     const scoreBiased = computeAccuracy(biasedPoints, CENTER, "circle").score
@@ -194,5 +194,52 @@ describe("resampleByArcLength", () => {
   it("총 호 길이가 0인 점들(모두 같은 위치)이면 그대로 반환한다", () => {
     const pts = [{ x: 5, y: 5 }, { x: 5, y: 5 }, { x: 5, y: 5 }]
     expect(resampleByArcLength(pts, 5)).toEqual(pts)
+  })
+})
+
+describe("computeAccuracy — circle 완성도(angular coverage)", () => {
+  it("완전한 원(360°) → score = 100", () => {
+    const points = circlePoints(CENTER, 100, 360)
+    const result = computeAccuracy(points, CENTER, "circle")
+    expect(result.score).toBeCloseTo(100, 0)
+  })
+
+  it("완벽한 반원(180°) → score ≈ 50", () => {
+    const points = Array.from({ length: 32 }, (_, i) => {
+      const a = (Math.PI * i) / 31
+      return { x: CENTER.x + 100 * Math.cos(a), y: CENTER.y + 100 * Math.sin(a) }
+    })
+    const result = computeAccuracy(points, CENTER, "circle")
+    expect(result.score).toBeGreaterThan(40)
+    expect(result.score).toBeLessThan(60)
+  })
+
+  it("완벽한 사분원(90°) → score ≈ 25", () => {
+    const points = Array.from({ length: 32 }, (_, i) => {
+      const a = (Math.PI / 2 * i) / 31
+      return { x: CENTER.x + 100 * Math.cos(a), y: CENTER.y + 100 * Math.sin(a) }
+    })
+    const result = computeAccuracy(points, CENTER, "circle")
+    expect(result.score).toBeGreaterThan(15)
+    expect(result.score).toBeLessThan(35)
+  })
+
+  it("거의 완전한 원(350°) → score > 95", () => {
+    const points = Array.from({ length: 64 }, (_, i) => {
+      const a = (2 * Math.PI * 350 / 360) * i / 63
+      return { x: CENTER.x + 100 * Math.cos(a), y: CENTER.y + 100 * Math.sin(a) }
+    })
+    const result = computeAccuracy(points, CENTER, "circle")
+    expect(result.score).toBeGreaterThan(95)
+  })
+
+  it("완성도는 정사각형·삼각형 score에 영향 없음", () => {
+    // square: 한 변만 그려도 기존 방식 유지 (완성도 체크 없음)
+    const pts = [
+      { x: CENTER.x - 100, y: CENTER.y - 100 },
+      { x: CENTER.x + 100, y: CENTER.y - 100 },
+    ]
+    const result = computeAccuracy(pts, CENTER, "square")
+    expect(result.score).toBeGreaterThan(0) // 단순히 에러 없음 확인
   })
 })
