@@ -34,6 +34,20 @@ function triangleNormalizedRadius(theta: number): number {
   return Math.cos(Math.PI / 3) / Math.cos(delta)
 }
 
+// Fraction of 360° covered by the drawn points, measured by the largest angular gap.
+// Full circle → 1.0, semicircle → ~0.5, quarter arc → ~0.25.
+function angularCoverage(points: DrawPoint[], center: DrawPoint): number {
+  if (points.length < 2) return 0
+  const angles = points
+    .map((p) => Math.atan2(p.y - center.y, p.x - center.x))
+    .sort((a, b) => a - b)
+  let maxGap = angles[0] + 2 * Math.PI - angles[angles.length - 1] // wrap-around gap
+  for (let i = 1; i < angles.length; i++) {
+    maxGap = Math.max(maxGap, angles[i] - angles[i - 1])
+  }
+  return Math.max(0, (2 * Math.PI - maxGap) / (2 * Math.PI))
+}
+
 function computeCircleAccuracy(points: DrawPoint[], center: DrawPoint): AccuracyResult {
   const dists = points.map((p) => dist(p, center))
   const idealRadius = mean(dists)
@@ -41,7 +55,9 @@ function computeCircleAccuracy(points: DrawPoint[], center: DrawPoint): Accuracy
     ...p,
     errorRatio: idealRadius === 0 ? 0 : clamp01(Math.abs(dists[i] - idealRadius) / idealRadius),
   }))
-  const score = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio))) * 100
+  const accuracy = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio)))
+  const completeness = angularCoverage(points, center)
+  const score = accuracy * completeness * 100
   return { score, coloredPoints, idealSize: idealRadius }
 }
 
