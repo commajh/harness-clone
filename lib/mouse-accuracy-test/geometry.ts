@@ -34,6 +34,20 @@ function triangleNormalizedRadius(theta: number): number {
   return Math.cos(Math.PI / 3) / Math.cos(delta)
 }
 
+// Fraction of 360° covered by the drawn points, measured by the largest angular gap.
+// Full circle → 1.0, semicircle → ~0.5, quarter arc → ~0.25.
+function angularCoverage(points: DrawPoint[], center: DrawPoint): number {
+  if (points.length < 2) return 0
+  const angles = points
+    .map((p) => Math.atan2(p.y - center.y, p.x - center.x))
+    .sort((a, b) => a - b)
+  let maxGap = angles[0] + 2 * Math.PI - angles[angles.length - 1] // wrap-around gap
+  for (let i = 1; i < angles.length; i++) {
+    maxGap = Math.max(maxGap, angles[i] - angles[i - 1])
+  }
+  return Math.max(0, (2 * Math.PI - maxGap) / (2 * Math.PI))
+}
+
 function computeCircleAccuracy(points: DrawPoint[], center: DrawPoint): AccuracyResult {
   const dists = points.map((p) => dist(p, center))
   const idealRadius = mean(dists)
@@ -41,7 +55,9 @@ function computeCircleAccuracy(points: DrawPoint[], center: DrawPoint): Accuracy
     ...p,
     errorRatio: idealRadius === 0 ? 0 : clamp01(Math.abs(dists[i] - idealRadius) / idealRadius),
   }))
-  const score = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio))) * 100
+  const accuracy = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio)))
+  const completeness = angularCoverage(points, center)
+  const score = accuracy * completeness * 100
   return { score, coloredPoints, idealSize: idealRadius }
 }
 
@@ -53,7 +69,9 @@ function computeSquareAccuracy(points: DrawPoint[], center: DrawPoint): Accuracy
     errorRatio:
       idealHalfSide === 0 ? 0 : clamp01(Math.abs(lInf[i] - idealHalfSide) / idealHalfSide),
   }))
-  const score = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio))) * 100
+  const accuracy = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio)))
+  const completeness = angularCoverage(points, center)
+  const score = accuracy * completeness * 100
   return { score, coloredPoints, idealSize: idealHalfSide }
 }
 
@@ -74,8 +92,45 @@ function computeTriangleAccuracy(points: DrawPoint[], center: DrawPoint): Accura
       errorRatio: circumradius === 0 ? 0 : clamp01(Math.abs(dists[i] - idealDist) / idealDist),
     }
   })
-  const score = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio))) * 100
+  const accuracy = clamp01(1 - mean(coloredPoints.map((p) => p.errorRatio)))
+  const completeness = angularCoverage(points, center)
+  const score = accuracy * completeness * 100
   return { score, coloredPoints, idealSize: circumradius }
+}
+
+/**
+ * Resamples a polyline to n evenly-spaced points by arc length.
+ * Eliminates score bias from variable mouse speed — slow sections no longer
+ * dominate the mean errorRatio just because they have more raw samples.
+ */
+export function resampleByArcLength(points: DrawPoint[], n: number): DrawPoint[] {
+  if (points.length <= 2) return points
+
+  // Build cumulative arc-length table
+  const arcLen: number[] = [0]
+  for (let i = 1; i < points.length; i++) {
+    arcLen.push(arcLen[i - 1] + dist(points[i - 1], points[i]))
+  }
+  const totalLen = arcLen[arcLen.length - 1]
+  if (totalLen === 0) return points
+
+  const result: DrawPoint[] = []
+  const step = totalLen / (n - 1)
+  let j = 0
+
+  for (let i = 0; i < n; i++) {
+    const target = i * step
+    // Advance segment pointer until the next arc-length exceeds target
+    while (j < arcLen.length - 2 && arcLen[j + 1] < target) j++
+    const segLen = arcLen[j + 1] - arcLen[j]
+    const t = segLen === 0 ? 0 : (target - arcLen[j]) / segLen
+    result.push({
+      x: points[j].x + t * (points[j + 1].x - points[j].x),
+      y: points[j].y + t * (points[j + 1].y - points[j].y),
+    })
+  }
+
+  return result
 }
 
 export function computeAccuracy(
