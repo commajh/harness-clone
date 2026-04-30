@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { computeAccuracy, triangleVertices } from "@/lib/mouse-accuracy-test/geometry"
+import { computeAccuracy, resampleByArcLength, triangleVertices } from "@/lib/mouse-accuracy-test/geometry"
 import type { AccuracyResult, DrawPoint, ShapeType } from "@/types/mouse-accuracy-test"
 
 const CANVAS_SIZE = 500
@@ -180,8 +180,10 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
       redraw([], null, shape)
       return
     }
-    const res = computeAccuracy(pts, center, shape)
+    const sampled = resampleByArcLength(pts, 200)
+    const res = computeAccuracy(sampled, center, shape)
     setResult(res)
+    // Raw pts for visual trajectory; sampled coloredPoints drive the color overlay
     redraw(pts, res, shape)
   }
 
