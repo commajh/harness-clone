@@ -101,11 +101,23 @@ interface AccuracyCanvasProps {
   shape: ShapeType
 }
 
+const MIN_RADIUS_PX = 10
+
+function meanDist(points: DrawPoint[], center: DrawPoint): number {
+  if (points.length === 0) return 0
+  const sum = points.reduce(
+    (s, p) => s + Math.sqrt((p.x - center.x) ** 2 + (p.y - center.y) ** 2),
+    0,
+  )
+  return sum / points.length
+}
+
 export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
   const pointsRef = useRef<DrawPoint[]>([])
   const [result, setResult] = useState<AccuracyResult | null>(null)
+  const [tooSmall, setTooSmall] = useState(false)
 
   const size = CANVAS_SIZE
   const center: DrawPoint = { x: size / 2, y: size / 2 }
@@ -124,6 +136,7 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
     drawingRef.current = false
     pointsRef.current = []
     setResult(null)
+    setTooSmall(false)
     redraw([], null, shape)
   }, [shape, redraw])
 
@@ -137,6 +150,7 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
     drawingRef.current = true
     pointsRef.current = [pt]
     setResult(null)
+    setTooSmall(false)
     redraw([pt], null, shape)
   }
 
@@ -151,6 +165,12 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
     if (!drawingRef.current) return
     drawingRef.current = false
     const pts = pointsRef.current
+    if (meanDist(pts, center) < MIN_RADIUS_PX) {
+      pointsRef.current = []
+      setTooSmall(true)
+      redraw([], null, shape)
+      return
+    }
     const res = computeAccuracy(pts, center, shape)
     setResult(res)
     redraw(pts, res, shape)
@@ -159,6 +179,7 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
   function handleReset() {
     pointsRef.current = []
     setResult(null)
+    setTooSmall(false)
     redraw([], null, shape)
   }
 
@@ -176,6 +197,10 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
         onMouseLeave={handleMouseUp}
         aria-label="drawing canvas"
       />
+
+      {tooSmall && (
+        <p className="text-sm text-destructive">너무 작습니다. 더 크게 그려주세요</p>
+      )}
 
       {result && (
         <div className="flex flex-col items-center gap-4">

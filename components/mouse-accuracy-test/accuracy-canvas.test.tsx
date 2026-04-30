@@ -115,6 +115,41 @@ describe("AccuracyCanvas — 다시 시도", () => {
   })
 })
 
+describe("AccuracyCanvas — 너무 작음 경고", () => {
+  it("중심 근처(< 10px)에서 그리면 경고 문구가 표시된다", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    const canvas = screen.getByLabelText("drawing canvas")
+    // jsdom: getBoundingClientRect returns 0,0 so clientX/Y are the coords directly
+    // canvas center = 250,250; points at 251,250 → dist=1px < 10px threshold
+    drawOnCanvas(canvas, [
+      { x: 251, y: 250 },
+      { x: 250, y: 251 },
+      { x: 249, y: 250 },
+    ])
+    expect(screen.getByText(/너무 작습니다/)).toBeTruthy()
+  })
+
+  it("너무 작음 경고 후 정확도 숫자가 표시되지 않는다", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    const canvas = screen.getByLabelText("drawing canvas")
+    drawOnCanvas(canvas, [
+      { x: 251, y: 250 },
+      { x: 250, y: 251 },
+    ])
+    expect(screen.queryByText(/%/)).toBeNull()
+  })
+
+  it("너무 작음 경고 후 바로 다시 그리기 가능하다(경고가 사라진다)", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    const canvas = screen.getByLabelText("drawing canvas")
+    drawOnCanvas(canvas, [{ x: 251, y: 250 }, { x: 250, y: 251 }])
+    expect(screen.getByText(/너무 작습니다/)).toBeTruthy()
+    // start new drawing — warning should clear
+    fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 })
+    expect(screen.queryByText(/너무 작습니다/)).toBeNull()
+  })
+})
+
 describe("AccuracyCanvas — 엣지 케이스", () => {
   it("점 1개(mousedown+mouseup)도 에러 없이 처리된다", () => {
     render(<AccuracyCanvas shape="circle" />)
