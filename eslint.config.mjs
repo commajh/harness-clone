@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Wireframe artifacts (plain HTML + CDN scripts, not part of app build)
+    "artifacts/**",
   ]),
 ]);
 

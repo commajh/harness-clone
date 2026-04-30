@@ -8,8 +8,13 @@ import type { AccuracyResult, DrawPoint, ShapeType } from "@/types/mouse-accurac
 const CANVAS_SIZE = 500
 const MIN_RADIUS_PX = 10
 
-function errorToHsl(errorRatio: number): string {
-  return `hsl(${Math.round((1 - errorRatio) * 120)}, 100%, 45%)`
+// green(0) → orange(0.5) → red(1) via piecewise hue interpolation
+function errorToColor(errorRatio: number): string {
+  const hue =
+    errorRatio <= 0.5
+      ? Math.round(120 - errorRatio * 180)       // 120 → 30
+      : Math.round(30 - (errorRatio - 0.5) * 60) //  30 →  0
+  return `hsl(${hue}, 90%, 45%)`
 }
 
 function meanDist(points: DrawPoint[], center: DrawPoint): number {
@@ -95,7 +100,7 @@ function drawScene(
   // Colored trajectory after mouseup
   const cp = result.coloredPoints
   for (let i = 1; i < cp.length; i++) {
-    ctx.strokeStyle = errorToHsl(cp[i].errorRatio)
+    ctx.strokeStyle = errorToColor(cp[i].errorRatio)
     ctx.lineWidth = 3
     ctx.setLineDash([])
     ctx.beginPath()
@@ -188,7 +193,7 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 p-6">
+    <div className="flex flex-col items-center gap-0 p-6">
       <canvas
         ref={canvasRef}
         width={size}
@@ -202,34 +207,37 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
         aria-label="drawing canvas"
       />
 
-      {tooSmall && (
-        <p className="text-sm text-destructive">너무 작습니다. 더 크게 그려주세요</p>
-      )}
+      {/* Fixed-height result area prevents canvas from shifting on show/hide */}
+      <div className="h-36 flex flex-col items-center justify-center gap-3">
+        {tooSmall && (
+          <p className="text-sm text-destructive">너무 작습니다. 더 크게 그려주세요</p>
+        )}
 
-      {result && (
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-5xl font-bold tabular-nums" data-testid="score">
-            {Math.round(result.score)}%
-          </div>
+        {result && (
+          <>
+            <div className="text-5xl font-bold tabular-nums" data-testid="score">
+              {Math.round(result.score)}%
+            </div>
 
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-5 h-1.5 rounded" style={{ background: errorToHsl(0) }} />
-              정확
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-5 h-1.5 rounded" style={{ background: errorToHsl(0.5) }} />
-              오차 작음
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-5 h-1.5 rounded" style={{ background: errorToHsl(1) }} />
-              오차 큼
-            </span>
-          </div>
+            <div className="flex gap-6 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-5 h-1.5 rounded" style={{ background: errorToColor(0) }} />
+                정확
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-5 h-1.5 rounded" style={{ background: errorToColor(0.5) }} />
+                오차 작음
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-5 h-1.5 rounded" style={{ background: errorToColor(1) }} />
+                오차 큼
+              </span>
+            </div>
 
-          <Button onClick={handleReset}>다시 시도</Button>
-        </div>
-      )}
+            <Button onClick={handleReset}>다시 시도</Button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

@@ -11,9 +11,18 @@ if [[ ! "$FILE_PATH" =~ \.(js|jsx|ts|tsx|mjs)$ ]]; then
   exit 0
 fi
 
+# Skip ESLint config itself and artifacts (not part of app build)
+if [[ "$FILE_PATH" =~ eslint\.config\. ]] || [[ "$FILE_PATH" =~ /artifacts/ ]]; then
+  exit 0
+fi
+
 [ ! -f "$FILE_PATH" ] && exit 0
 
-RESULT=$(bunx eslint --fix "$FILE_PATH" 2>&1)
+REPO_ROOT=$(git rev-parse --show-toplevel)
+ESLINT_BIN="$REPO_ROOT/node_modules/.bin/eslint"
+[ ! -f "$ESLINT_BIN" ] && exit 0
+
+RESULT=$("$ESLINT_BIN" --fix "$FILE_PATH" 2>&1)
 ESLINT_EXIT=$?
 
 if [ $ESLINT_EXIT -eq 0 ]; then
