@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { computeAccuracy } from "@/lib/mouse-accuracy-test/geometry"
-import type { AccuracyResult, DrawPoint } from "@/types/mouse-accuracy-test"
+import { computeAccuracy, triangleVertices } from "@/lib/mouse-accuracy-test/geometry"
+import type { AccuracyResult, DrawPoint, ShapeType } from "@/types/mouse-accuracy-test"
 
 const CANVAS_SIZE = 500
 
@@ -11,9 +11,39 @@ function errorToHsl(errorRatio: number): string {
   return `hsl(${Math.round((1 - errorRatio) * 120)}, 100%, 45%)`
 }
 
+function drawIdealOverlay(
+  ctx: CanvasRenderingContext2D,
+  shape: ShapeType,
+  cx: number,
+  cy: number,
+  idealSize: number,
+) {
+  ctx.strokeStyle = "#3b82f6"
+  ctx.lineWidth = 1.5
+  ctx.setLineDash([6, 4])
+  ctx.beginPath()
+
+  if (shape === "circle") {
+    ctx.arc(cx, cy, idealSize, 0, 2 * Math.PI)
+  } else if (shape === "square") {
+    const h = idealSize
+    ctx.rect(cx - h, cy - h, h * 2, h * 2)
+  } else {
+    const [v0, v1, v2] = triangleVertices({ x: cx, y: cy }, idealSize)
+    ctx.moveTo(v0.x, v0.y)
+    ctx.lineTo(v1.x, v1.y)
+    ctx.lineTo(v2.x, v2.y)
+    ctx.closePath()
+  }
+
+  ctx.stroke()
+  ctx.setLineDash([])
+}
+
 function drawScene(
   ctx: CanvasRenderingContext2D,
   size: number,
+  shape: ShapeType,
   points: DrawPoint[],
   result: AccuracyResult | null,
 ) {
@@ -64,17 +94,14 @@ function drawScene(
     ctx.stroke()
   }
 
-  // Ideal circle dashed overlay
-  ctx.strokeStyle = "#3b82f6"
-  ctx.lineWidth = 1.5
-  ctx.setLineDash([6, 4])
-  ctx.beginPath()
-  ctx.arc(cx, cy, result.idealSize, 0, 2 * Math.PI)
-  ctx.stroke()
-  ctx.setLineDash([])
+  drawIdealOverlay(ctx, shape, cx, cy, result.idealSize)
 }
 
-export function AccuracyCanvas() {
+interface AccuracyCanvasProps {
+  shape: ShapeType
+}
+
+export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
   const pointsRef = useRef<DrawPoint[]>([])
@@ -84,17 +111,21 @@ export function AccuracyCanvas() {
   const center: DrawPoint = { x: size / 2, y: size / 2 }
 
   const redraw = useCallback(
-    (points: DrawPoint[], res: AccuracyResult | null) => {
+    (points: DrawPoint[], res: AccuracyResult | null, currentShape: ShapeType) => {
       const ctx = canvasRef.current?.getContext("2d")
       if (!ctx) return
-      drawScene(ctx, size, points, res)
+      drawScene(ctx, size, currentShape, points, res)
     },
     [size],
   )
 
+  // Reset canvas when shape changes
   useEffect(() => {
-    redraw([], null)
-  }, [redraw])
+    drawingRef.current = false
+    pointsRef.current = []
+    setResult(null)
+    redraw([], null, shape)
+  }, [shape, redraw])
 
   function getPoint(e: React.MouseEvent<HTMLCanvasElement>): DrawPoint {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -106,29 +137,29 @@ export function AccuracyCanvas() {
     drawingRef.current = true
     pointsRef.current = [pt]
     setResult(null)
-    redraw([pt], null)
+    redraw([pt], null, shape)
   }
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
     if (!drawingRef.current) return
     const pt = getPoint(e)
     pointsRef.current = [...pointsRef.current, pt]
-    redraw(pointsRef.current, null)
+    redraw(pointsRef.current, null, shape)
   }
 
   function handleMouseUp() {
     if (!drawingRef.current) return
     drawingRef.current = false
     const pts = pointsRef.current
-    const res = computeAccuracy(pts, center, "circle")
+    const res = computeAccuracy(pts, center, shape)
     setResult(res)
-    redraw(pts, res)
+    redraw(pts, res, shape)
   }
 
   function handleReset() {
     pointsRef.current = []
     setResult(null)
-    redraw([], null)
+    redraw([], null, shape)
   }
 
   return (

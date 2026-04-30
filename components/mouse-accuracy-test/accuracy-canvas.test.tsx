@@ -6,8 +6,10 @@ const mockCtx = {
   clearRect: vi.fn(),
   beginPath: vi.fn(),
   arc: vi.fn(),
+  rect: vi.fn(),
   moveTo: vi.fn(),
   lineTo: vi.fn(),
+  closePath: vi.fn(),
   stroke: vi.fn(),
   setLineDash: vi.fn(),
   strokeStyle: "",
@@ -29,76 +31,103 @@ function drawOnCanvas(canvas: HTMLElement, points: { x: number; y: number }[]) {
   fireEvent.mouseUp(canvas)
 }
 
-describe("AccuracyCanvas", () => {
-  it("초기 상태: 정확도 숫자가 없다", () => {
-    render(<AccuracyCanvas />)
+const SAMPLE_POINTS = [
+  { x: 100, y: 200 },
+  { x: 150, y: 150 },
+  { x: 200, y: 100 },
+]
+
+describe("AccuracyCanvas — 초기 상태", () => {
+  it("정확도 숫자가 없다", () => {
+    render(<AccuracyCanvas shape="circle" />)
     expect(screen.queryByText(/%/)).toBeNull()
   })
 
-  it("초기 상태: 다시 시도 버튼이 없다", () => {
-    render(<AccuracyCanvas />)
+  it("다시 시도 버튼이 없다", () => {
+    render(<AccuracyCanvas shape="circle" />)
     expect(screen.queryByRole("button", { name: /다시 시도/ })).toBeNull()
   })
+})
 
-  it("mouseup 후 정확도 %가 표시된다", () => {
-    render(<AccuracyCanvas />)
-    const canvas = screen.getByLabelText("drawing canvas")
-    drawOnCanvas(canvas, [
-      { x: 100, y: 200 },
-      { x: 150, y: 150 },
-      { x: 200, y: 100 },
-    ])
+describe("AccuracyCanvas — mouseup 후 결과 (circle)", () => {
+  it("정확도 %가 표시된다", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
     expect(screen.getByText(/%/)).toBeTruthy()
   })
 
-  it("mouseup 후 다시 시도 버튼이 나타난다", () => {
-    render(<AccuracyCanvas />)
-    const canvas = screen.getByLabelText("drawing canvas")
-    drawOnCanvas(canvas, [
-      { x: 100, y: 200 },
-      { x: 150, y: 150 },
-    ])
+  it("다시 시도 버튼이 나타난다", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
     expect(screen.getByRole("button", { name: /다시 시도/ })).toBeTruthy()
   })
 
-  it("mouseup 후 색상 범례가 표시된다", () => {
-    render(<AccuracyCanvas />)
-    const canvas = screen.getByLabelText("drawing canvas")
-    drawOnCanvas(canvas, [
-      { x: 100, y: 200 },
-      { x: 150, y: 150 },
-    ])
+  it("색상 범례가 표시된다", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
     expect(screen.getByText("정확")).toBeTruthy()
     expect(screen.getByText("오차 작음")).toBeTruthy()
     expect(screen.getByText("오차 큼")).toBeTruthy()
   })
+})
 
-  it("다시 시도 클릭 시 정확도 숫자가 사라진다", () => {
-    render(<AccuracyCanvas />)
-    const canvas = screen.getByLabelText("drawing canvas")
-    drawOnCanvas(canvas, [
-      { x: 100, y: 200 },
-      { x: 150, y: 150 },
-    ])
+describe("AccuracyCanvas — mouseup 후 결과 (square)", () => {
+  it("정확도 %가 표시된다", () => {
+    render(<AccuracyCanvas shape="square" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
+    expect(screen.getByText(/%/)).toBeTruthy()
+  })
+
+  it("다시 시도 버튼이 나타난다", () => {
+    render(<AccuracyCanvas shape="square" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
+    expect(screen.getByRole("button", { name: /다시 시도/ })).toBeTruthy()
+  })
+})
+
+describe("AccuracyCanvas — mouseup 후 결과 (triangle)", () => {
+  it("정확도 %가 표시된다", () => {
+    render(<AccuracyCanvas shape="triangle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
+    expect(screen.getByText(/%/)).toBeTruthy()
+  })
+
+  it("다시 시도 버튼이 나타난다", () => {
+    render(<AccuracyCanvas shape="triangle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
+    expect(screen.getByRole("button", { name: /다시 시도/ })).toBeTruthy()
+  })
+})
+
+describe("AccuracyCanvas — 다시 시도", () => {
+  it("클릭 시 정확도 숫자가 사라진다", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
     fireEvent.click(screen.getByRole("button", { name: /다시 시도/ }))
     expect(screen.queryByText(/%/)).toBeNull()
   })
 
-  it("다시 시도 클릭 후 버튼이 사라진다", () => {
-    render(<AccuracyCanvas />)
-    const canvas = screen.getByLabelText("drawing canvas")
-    drawOnCanvas(canvas, [
-      { x: 100, y: 200 },
-      { x: 150, y: 150 },
-    ])
+  it("클릭 후 버튼이 사라진다", () => {
+    render(<AccuracyCanvas shape="circle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
     fireEvent.click(screen.getByRole("button", { name: /다시 시도/ }))
     expect(screen.queryByRole("button", { name: /다시 시도/ })).toBeNull()
   })
+})
 
-  it("점 1개(mousedown+mouseup, mousemove 없음)도 에러 없이 처리된다", () => {
-    render(<AccuracyCanvas />)
+describe("AccuracyCanvas — 엣지 케이스", () => {
+  it("점 1개(mousedown+mouseup)도 에러 없이 처리된다", () => {
+    render(<AccuracyCanvas shape="circle" />)
     const canvas = screen.getByLabelText("drawing canvas")
     fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 })
     expect(() => fireEvent.mouseUp(canvas)).not.toThrow()
+  })
+
+  it("shape prop 변경 시 결과가 초기화된다", () => {
+    const { rerender } = render(<AccuracyCanvas shape="circle" />)
+    drawOnCanvas(screen.getByLabelText("drawing canvas"), SAMPLE_POINTS)
+    expect(screen.getByText(/%/)).toBeTruthy()
+    rerender(<AccuracyCanvas shape="square" />)
+    expect(screen.queryByText(/%/)).toBeNull()
   })
 })
