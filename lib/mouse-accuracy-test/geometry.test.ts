@@ -27,12 +27,27 @@ function squareBoundaryPoints(center: DrawPoint, halfSide: number): DrawPoint[] 
   ]
 }
 
-function triangleBoundaryPoints(center: DrawPoint, circumradius: number): DrawPoint[] {
+// Generates n points per side (total 4n), providing dense angular coverage for completeness tests.
+function denseSquareBoundaryPoints(center: DrawPoint, halfSide: number, n: number): DrawPoint[] {
+  const s = halfSide
+  const cx = center.x
+  const cy = center.y
+  const pts: DrawPoint[] = []
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1)
+    pts.push({ x: cx - s + t * 2 * s, y: cy - s })      // top
+    pts.push({ x: cx + s, y: cy - s + t * 2 * s })      // right
+    pts.push({ x: cx + s - t * 2 * s, y: cy + s })      // bottom
+    pts.push({ x: cx - s, y: cy + s - t * 2 * s })      // left
+  }
+  return pts
+}
+
+function triangleBoundaryPoints(center: DrawPoint, circumradius: number, steps = 6): DrawPoint[] {
   const r = circumradius
   const v0 = { x: center.x, y: center.y - r }
   const v1 = { x: center.x + (r * Math.sqrt(3)) / 2, y: center.y + r / 2 }
   const v2 = { x: center.x - (r * Math.sqrt(3)) / 2, y: center.y + r / 2 }
-  const steps = 6
   const points: DrawPoint[] = []
   for (let i = 0; i <= steps; i++) {
     const t = i / steps
@@ -89,10 +104,10 @@ describe("computeAccuracy — circle", () => {
 })
 
 describe("computeAccuracy — square", () => {
-  it("완벽한 정사각형 경계 위의 점들 → score = 100", () => {
-    const points = squareBoundaryPoints(CENTER, 100)
+  it("완벽한 정사각형 경계 위의 점들 → score ≈ 100", () => {
+    const points = denseSquareBoundaryPoints(CENTER, 100, 50)
     const result = computeAccuracy(points, CENTER, "square")
-    expect(result.score).toBeCloseTo(100, 0)
+    expect(result.score).toBeGreaterThan(99)
   })
 
   it("coloredPoints 길이 = 입력 points 길이", () => {
@@ -112,10 +127,10 @@ describe("computeAccuracy — square", () => {
 })
 
 describe("computeAccuracy — triangle", () => {
-  it("완벽한 정삼각형(꼭짓점 위) 경계 위의 점들 → score = 100", () => {
-    const points = triangleBoundaryPoints(CENTER, 100)
+  it("완벽한 정삼각형(꼭짓점 위) 경계 위의 점들 → score ≈ 100", () => {
+    const points = triangleBoundaryPoints(CENTER, 100, 60)
     const result = computeAccuracy(points, CENTER, "triangle")
-    expect(result.score).toBeCloseTo(100, 1)
+    expect(result.score).toBeGreaterThan(99)
   })
 
   it("coloredPoints 길이 = 입력 points 길이", () => {
@@ -233,13 +248,52 @@ describe("computeAccuracy — circle 완성도(angular coverage)", () => {
     expect(result.score).toBeGreaterThan(95)
   })
 
-  it("완성도는 정사각형·삼각형 score에 영향 없음", () => {
-    // square: 한 변만 그려도 기존 방식 유지 (완성도 체크 없음)
-    const pts = [
-      { x: CENTER.x - 100, y: CENTER.y - 100 },
-      { x: CENTER.x + 100, y: CENTER.y - 100 },
-    ]
-    const result = computeAccuracy(pts, CENTER, "square")
-    expect(result.score).toBeGreaterThan(0) // 단순히 에러 없음 확인
+})
+
+describe("computeAccuracy — square 완성도(angular coverage)", () => {
+  it("완전한 정사각형(4변) → score > 99", () => {
+    const points = denseSquareBoundaryPoints(CENTER, 100, 50)
+    const result = computeAccuracy(points, CENTER, "square")
+    expect(result.score).toBeGreaterThan(99)
+  })
+
+  it("정사각형 한 변만 그리면 score ≈ 25", () => {
+    // 윗변만: 각도 -135° ~ -45° → 완성도 90°/360° = 25%
+    const points = denseSquareBoundaryPoints(CENTER, 100, 50).filter(
+      (_, i) => i % 4 === 0, // top side only (every 4th starting from index 0)
+    )
+    const result = computeAccuracy(points, CENTER, "square")
+    expect(result.score).toBeCloseTo(25, 0)
+  })
+
+  it("정사각형 세 변(75%) → score ≈ 75", () => {
+    // 윗변·오른쪽·아랫변: 각도 -135° ~ 135° → 완성도 270°/360° = 75%
+    const points = denseSquareBoundaryPoints(CENTER, 100, 50).filter(
+      (_, i) => i % 4 !== 3, // exclude left side (index % 4 === 3)
+    )
+    const result = computeAccuracy(points, CENTER, "square")
+    expect(result.score).toBeCloseTo(75, 0)
+  })
+})
+
+describe("computeAccuracy — triangle 완성도(angular coverage)", () => {
+  it("완전한 정삼각형 → score > 99", () => {
+    const points = triangleBoundaryPoints(CENTER, 100, 60)
+    const result = computeAccuracy(points, CENTER, "triangle")
+    expect(result.score).toBeGreaterThan(99)
+  })
+
+  it("정삼각형 한 변만 그리면 score ≈ 33", () => {
+    // v0→v1: -90° ~ 30° → 완성도 120°/360° = 33.3%
+    const r = 100
+    const v0 = { x: CENTER.x, y: CENTER.y - r }
+    const v1 = { x: CENTER.x + (r * Math.sqrt(3)) / 2, y: CENTER.y + r / 2 }
+    const n = 60
+    const points = Array.from({ length: n }, (_, i) => {
+      const t = i / (n - 1)
+      return { x: v0.x + t * (v1.x - v0.x), y: v0.y + t * (v1.y - v0.y) }
+    })
+    const result = computeAccuracy(points, CENTER, "triangle")
+    expect(result.score).toBeCloseTo(33, 0)
   })
 })
