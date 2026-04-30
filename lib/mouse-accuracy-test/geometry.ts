@@ -5,20 +5,12 @@ function dist(a: DrawPoint, b: DrawPoint): number {
 }
 
 function mean(vals: number[]): number {
+  if (vals.length === 0) return 0
   return vals.reduce((s, v) => s + v, 0) / vals.length
 }
 
 function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v))
-}
-
-function distToSegment(p: DrawPoint, a: DrawPoint, b: DrawPoint): number {
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const lenSq = dx * dx + dy * dy
-  if (lenSq === 0) return dist(p, a)
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq))
-  return dist(p, { x: a.x + t * dx, y: a.y + t * dy })
 }
 
 // Vertex at top (y points down in screen coords → top = -π/2)
@@ -33,8 +25,9 @@ export function triangleVertices(center: DrawPoint, circumradius: number): [Draw
   ]
 }
 
-// Polar boundary of equilateral triangle: r(θ) = cos(π/3) / cos(δ) * R
-// where δ is the angle within the [-π/3, π/3] sector around the nearest vertex
+// Returns the dimensionless boundary ratio r(θ)/R for an equilateral triangle.
+// δ is the angle within the [-π/3, π/3] sector around the nearest vertex.
+// Multiply the result by the circumradius to get the actual boundary distance.
 function triangleNormalizedRadius(theta: number): number {
   const sector = (2 * Math.PI) / 3
   const delta = ((theta - TRIANGLE_VERTEX_ANGLE) % sector + sector) % sector - Math.PI / 3
@@ -102,4 +95,3 @@ export function computeAccuracy(
       return computeTriangleAccuracy(points, center)
   }
 }
-

@@ -6,9 +6,19 @@ import { computeAccuracy, triangleVertices } from "@/lib/mouse-accuracy-test/geo
 import type { AccuracyResult, DrawPoint, ShapeType } from "@/types/mouse-accuracy-test"
 
 const CANVAS_SIZE = 500
+const MIN_RADIUS_PX = 10
 
 function errorToHsl(errorRatio: number): string {
   return `hsl(${Math.round((1 - errorRatio) * 120)}, 100%, 45%)`
+}
+
+function meanDist(points: DrawPoint[], center: DrawPoint): number {
+  if (points.length === 0) return 0
+  const sum = points.reduce(
+    (s, p) => s + Math.sqrt((p.x - center.x) ** 2 + (p.y - center.y) ** 2),
+    0,
+  )
+  return sum / points.length
 }
 
 function drawIdealOverlay(
@@ -69,7 +79,7 @@ function drawScene(
   if (points.length < 2) return
 
   if (!result) {
-    // Gray trajectory while drawing
+    // Gray trajectory while drawing — no color feedback until mouseup
     ctx.strokeStyle = "#999"
     ctx.lineWidth = 2
     ctx.setLineDash([])
@@ -101,17 +111,6 @@ interface AccuracyCanvasProps {
   shape: ShapeType
 }
 
-const MIN_RADIUS_PX = 10
-
-function meanDist(points: DrawPoint[], center: DrawPoint): number {
-  if (points.length === 0) return 0
-  const sum = points.reduce(
-    (s, p) => s + Math.sqrt((p.x - center.x) ** 2 + (p.y - center.y) ** 2),
-    0,
-  )
-  return sum / points.length
-}
-
 export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
@@ -141,8 +140,14 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
   }, [shape, redraw])
 
   function getPoint(e: React.MouseEvent<HTMLCanvasElement>): DrawPoint {
-    const rect = canvasRef.current!.getBoundingClientRect()
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    const canvas = canvasRef.current!
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = rect.width > 0 ? canvas.width / rect.width : 1
+    const scaleY = rect.height > 0 ? canvas.height / rect.height : 1
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    }
   }
 
   function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -156,8 +161,7 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
     if (!drawingRef.current) return
-    const pt = getPoint(e)
-    pointsRef.current = [...pointsRef.current, pt]
+    pointsRef.current.push(getPoint(e))
     redraw(pointsRef.current, null, shape)
   }
 
@@ -204,7 +208,7 @@ export function AccuracyCanvas({ shape }: AccuracyCanvasProps) {
 
       {result && (
         <div className="flex flex-col items-center gap-4">
-          <div className="text-5xl font-bold tabular-nums">
+          <div className="text-5xl font-bold tabular-nums" data-testid="score">
             {Math.round(result.score)}%
           </div>
 
