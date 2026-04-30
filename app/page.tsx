@@ -1,5 +1,9 @@
-import { ComponentExample } from "@/components/component-example";
+import { ShapeSelector } from "@/components/mouse-accuracy-test/shape-selector"
 
 export default function Page() {
-return <ComponentExample />;
+  return (
+    <main className="min-h-screen flex flex-col items-center justify-center">
+      <ShapeSelector />
+    </main>
+  )
 }
