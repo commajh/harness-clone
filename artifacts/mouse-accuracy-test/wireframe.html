@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wireframe: Mouse Accuracy Test</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --w-bg: #f5f5f5;
+    --w-border: #ccc;
+    --w-text: #555;
+    --w-muted: #aaa;
+    --w-fill: #eee;
+  }
+
+  * { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; color: var(--w-text); }
+  body { background: var(--w-bg); }
+  nav { position: sticky; top: 0; z-index: 40; background: var(--w-bg); border-bottom: 1px solid var(--w-border); }
+  nav button { cursor: pointer; font-size: 13px; }
+  nav button:hover { background: var(--w-fill); border-radius: 4px; }
+  nav button.active { font-weight: bold; border-bottom: 2px solid var(--w-text); }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .vp-toggle button { font-size: 12px; padding: 2px 8px; border: 1px solid var(--w-border); cursor: pointer; background: white; }
+  .vp-toggle button:first-child { border-radius: 4px 0 0 4px; }
+  .vp-toggle button:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+  .vp-toggle button.active { background: var(--w-text); color: white; }
+  body.viewport-mobile .screen-content {
+    max-width: 375px !important;
+    margin: 24px auto !important;
+    border: 2px solid var(--w-border);
+    border-radius: 24px;
+    min-height: 667px;
+    background: white;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 32px 16px !important;
+  }
+  .screen-notes { background: #fffde7; border-left: 3px solid #ffd54f; padding: 12px 16px; margin-top: 24px; font-size: 13px; border-radius: 0 4px 4px 0; }
+  .screen-notes summary { cursor: pointer; font-weight: bold; font-size: 12px; color: #b0a050; text-transform: uppercase; letter-spacing: 0.05em; }
+  .screen-notes p { margin: 6px 0 2px; color: #777; }
+  .screen-notes ul { margin: 4px 0 0 16px; padding: 0; color: #777; }
+  .screen-notes li { margin: 2px 0; }
+
+  /* Trajectory colors (feature-core — validates color feedback concept) */
+  .w-traj-ok   { stroke: #6aaa88; stroke-width: 3.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .w-traj-warn { stroke: #cc9944; stroke-width: 3.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .w-traj-err  { stroke: #cc5555; stroke-width: 3.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .w-ideal     { stroke: var(--w-muted); stroke-width: 1.5; fill: none; stroke-dasharray: 6 3; }
+  .w-center    { stroke: var(--w-border); stroke-width: 2; }
+
+  /* UI components */
+  .w-shape-btn { border: 1px solid var(--w-border); padding: 6px 16px; border-radius: 4px; cursor: default; background: var(--w-fill); font-size: 13px; white-space: nowrap; }
+  .w-shape-btn.active { background: var(--w-text); border-color: var(--w-text); color: white !important; }
+  .w-canvas-wrap { background: white; border: 1px solid var(--w-border); border-radius: 4px; width: 100%; aspect-ratio: 1 / 1; max-width: 420px; margin: 0 auto; overflow: hidden; cursor: crosshair; }
+  .w-btn-primary { border: 1px solid var(--w-border); padding: 8px 24px; border-radius: 4px; background: var(--w-fill); font-size: 13px; cursor: default; }
+  .w-accuracy-num { font-size: 2.8rem; font-weight: bold; letter-spacing: -0.03em; color: var(--w-text); line-height: 1; }
+  .w-accuracy-label { font-size: 11px; color: var(--w-muted); margin-top: 4px; }
+  .w-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+  .w-warning-msg { border: 1px solid var(--w-border); padding: 10px 18px; border-radius: 4px; background: var(--w-fill); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body class="p-0 m-0 viewport-desktop">
+
+<nav class="flex items-center gap-4 px-6 py-2">
+  <span class="text-xs" style="color:var(--w-muted)">wireframe</span>
+  <button id="nav-0" onclick="show(0)" class="px-2 py-1">초기 상태</button>
+  <button id="nav-1" onclick="show(1)" class="px-2 py-1">결과 — 원</button>
+  <button id="nav-2" onclick="show(2)" class="px-2 py-1">결과 — 정사각형</button>
+  <button id="nav-3" onclick="show(3)" class="px-2 py-1">결과 — 정삼각형</button>
+  <button id="nav-4" onclick="show(4)" class="px-2 py-1">너무 작음</button>
+  <div class="vp-toggle flex ml-auto">
+    <button id="vp-desktop" onclick="setViewport('desktop')" class="active">Desktop</button>
+    <button id="vp-mobile" onclick="setViewport('mobile')">Mobile</button>
+  </div>
+</nav>
+
+<!-- ─── Screen 0: 초기 상태 ─────────────────────────────────── -->
+<div id="screen-0" class="screen" data-scenario="scenario-1">
+  <div class="screen-content @container max-w-3xl mx-auto p-6">
+    <h2 class="text-lg font-bold mb-6" style="color:var(--w-muted); border-bottom:1px solid var(--w-border); padding-bottom:8px;">
+      초기 상태
+    </h2>
+
+    <div class="flex flex-col items-center gap-5">
+
+      <!-- App title -->
+      <div class="text-center">
+        <div class="text-base font-bold">Mouse Accuracy Test</div>
+        <div class="text-xs mt-1" style="color:var(--w-muted)">마우스로 도형을 얼마나 정확하게 그릴 수 있나요?</div>
+      </div>
+
+      <!-- Shape selector -->
+      <div class="flex gap-2">
+        <button class="w-shape-btn active">원</button>
+        <button class="w-shape-btn">정사각형</button>
+        <button class="w-shape-btn">정삼각형</button>
+      </div>
+
+      <!-- Canvas: center point only -->
+      <div class="w-canvas-wrap">
+        <svg viewBox="0 0 400 400" width="100%" height="100%">
+          <!-- Center cross -->
+          <line x1="188" y1="200" x2="212" y2="200" class="w-center"/>
+          <line x1="200" y1="188" x2="200" y2="212" class="w-center"/>
+          <!-- Instruction text -->
+          <text x="200" y="246" text-anchor="middle" font-size="13" fill="#bbb" font-family="monospace">중심점 기준으로 도형을 그려주세요</text>
+          <text x="200" y="264" text-anchor="middle" font-size="11" fill="#ccc" font-family="monospace">mousedown 시작 → mouseup 완료</text>
+        </svg>
+      </div>
+
+      <!-- No accuracy / no retry in initial state -->
+      <div class="text-xs" style="color:var(--w-muted)">도형을 그리면 정확도가 표시됩니다</div>
+
+    </div>
+
+    <div class="screen-notes">
+      <details open>
+        <summary>Notes</summary>
+        <ul>
+          <li>트리거: 페이지 최초 접속 / 도형 선택 변경 / "다시 시도" 클릭 후</li>
+          <li>인터랙션: 도형 버튼 클릭 → 캔버스 초기화 (같은 화면 유지) / mousedown → 그리기 시작 → 결과 화면으로 전환</li>
+          <li>전환: mouseup 시 결과 화면(Screen 1~3 중 선택된 도형)</li>
+        </ul>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── Screen 1: 결과 — 원 ──────────────────────────────────── -->
+<div id="screen-1" class="screen" data-scenario="scenario-2">
+  <div class="screen-content @container max-w-3xl mx-auto p-6">
+    <h2 class="text-lg font-bold mb-6" style="color:var(--w-muted); border-bottom:1px solid var(--w-border); padding-bottom:8px;">
+      결과 — 원
+    </h2>
+
+    <div class="flex flex-col items-center gap-5">
+
+      <div class="text-center">
+        <div class="text-base font-bold">Mouse Accuracy Test</div>
+      </div>
+
+      <!-- Shape selector -->
+      <div class="flex gap-2">
+        <button class="w-shape-btn active">원</button>
+        <button class="w-shape-btn">정사각형</button>
+        <button class="w-shape-btn">정삼각형</button>
+      </div>
+
+      <!-- Canvas: trajectory + ideal circle overlay -->
+      <div class="w-canvas-wrap">
+        <svg viewBox="0 0 400 400" width="100%" height="100%">
+          <!-- Ideal circle (dashed) -->
+          <circle cx="200" cy="200" r="110" class="w-ideal"/>
+
+          <!-- User trajectory: split into colored segments -->
+          <!-- ok: right → top (12시~3시 구간, 잘 그린 부분) -->
+          <path d="M 310 200 Q 292 136 248 108 Q 224 95 200 90" class="w-traj-ok"/>
+          <!-- err: top → left (9시 구간, 많이 벗어난 부분) -->
+          <path d="M 200 90 Q 155 100 120 130 Q 96 158 88 200" class="w-traj-err"/>
+          <!-- warn: left → bottom (6시 구간, 약간 벗어남) -->
+          <path d="M 88 200 Q 96 252 126 280 Q 158 308 200 314" class="w-traj-warn"/>
+          <!-- ok: bottom → right (3시 구간, 잘 그린 부분) -->
+          <path d="M 200 314 Q 248 310 280 286 Q 308 260 310 200" class="w-traj-ok"/>
+
+          <!-- Center cross -->
+          <line x1="188" y1="200" x2="212" y2="200" class="w-center"/>
+          <line x1="200" y1="188" x2="200" y2="212" class="w-center"/>
+        </svg>
+      </div>
+
+      <!-- Accuracy + Retry -->
+      <div class="flex flex-col items-center gap-2">
+        <div class="w-accuracy-num">87.3%</div>
+        <div class="w-accuracy-label">정확도</div>
+      </div>
+
+      <button class="w-btn-primary">
+        <i data-lucide="refresh-cw" style="display:inline;width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i>
+        다시 시도
+      </button>
+
+      <!-- Color legend -->
+      <div class="flex gap-4 text-xs" style="color:var(--w-muted)">
+        <span><span class="w-legend-dot" style="background:#6aaa88"></span>정확</span>
+        <span><span class="w-legend-dot" style="background:#cc9944"></span>오차 작음</span>
+        <span><span class="w-legend-dot" style="background:#cc5555"></span>오차 큼</span>
+      </div>
+
+    </div>
+
+    <div class="screen-notes">
+      <details open>
+        <summary>Notes</summary>
+        <ul>
+          <li>트리거: 원 선택 후 mouseup 완료</li>
+          <li>인터랙션: 궤적 위 색상이 즉시 렌더됨 / 이상적 원(dashed)이 오버레이로 표시 / 정확도 % 표시</li>
+          <li>인터랙션: "다시 시도" 클릭 → 초기 화면으로 (선택 도형 유지)</li>
+          <li>전환: 도형 버튼 클릭 → 초기 화면(해당 도형 선택)</li>
+        </ul>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── Screen 2: 결과 — 정사각형 ─────────────────────────────── -->
+<div id="screen-2" class="screen" data-scenario="scenario-3">
+  <div class="screen-content @container max-w-3xl mx-auto p-6">
+    <h2 class="text-lg font-bold mb-6" style="color:var(--w-muted); border-bottom:1px solid var(--w-border); padding-bottom:8px;">
+      결과 — 정사각형 <span style="font-size:12px; font-weight:normal">(방향 고정: 변이 수평/수직)</span>
+    </h2>
+
+    <div class="flex flex-col items-center gap-5">
+
+      <div class="text-center">
+        <div class="text-base font-bold">Mouse Accuracy Test</div>
+      </div>
+
+      <div class="flex gap-2">
+        <button class="w-shape-btn">원</button>
+        <button class="w-shape-btn active">정사각형</button>
+        <button class="w-shape-btn">정삼각형</button>
+      </div>
+
+      <!-- Canvas: trajectory + ideal square overlay -->
+      <div class="w-canvas-wrap">
+        <svg viewBox="0 0 400 400" width="100%" height="100%">
+          <!-- Ideal square (dashed), 100,100 to 300,300 -->
+          <rect x="100" y="100" width="200" height="200" class="w-ideal"/>
+
+          <!-- User trajectory: wobbly square with color segments -->
+          <!-- ok: top edge -->
+          <path d="M 102 103 L 200 97 L 298 103" class="w-traj-ok"/>
+          <!-- warn: right edge -->
+          <path d="M 298 103 L 308 200 L 298 298" class="w-traj-warn"/>
+          <!-- ok: bottom edge -->
+          <path d="M 298 298 L 200 304 L 102 297" class="w-traj-ok"/>
+          <!-- err: left edge -->
+          <path d="M 102 297 L 90 200 L 102 103" class="w-traj-err"/>
+
+          <!-- Center cross -->
+          <line x1="188" y1="200" x2="212" y2="200" class="w-center"/>
+          <line x1="200" y1="188" x2="200" y2="212" class="w-center"/>
+        </svg>
+      </div>
+
+      <div class="flex flex-col items-center gap-2">
+        <div class="w-accuracy-num">82.1%</div>
+        <div class="w-accuracy-label">정확도</div>
+      </div>
+
+      <button class="w-btn-primary">
+        <i data-lucide="refresh-cw" style="display:inline;width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i>
+        다시 시도
+      </button>
+
+      <div class="flex gap-4 text-xs" style="color:var(--w-muted)">
+        <span><span class="w-legend-dot" style="background:#6aaa88"></span>정확</span>
+        <span><span class="w-legend-dot" style="background:#cc9944"></span>오차 작음</span>
+        <span><span class="w-legend-dot" style="background:#cc5555"></span>오차 큼</span>
+      </div>
+
+    </div>
+
+    <div class="screen-notes">
+      <details open>
+        <summary>Notes</summary>
+        <ul>
+          <li>트리거: 정사각형 선택 후 mouseup 완료</li>
+          <li>이상적 정사각형은 변이 수평·수직으로 고정 — 사용자가 어떤 방향으로 그려도 기준은 동일</li>
+          <li>인터랙션: 동일 (색상 궤적 + 오버레이 + % + 다시 시도)</li>
+        </ul>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── Screen 3: 결과 — 정삼각형 ────────────────────────────── -->
+<div id="screen-3" class="screen" data-scenario="scenario-4">
+  <div class="screen-content @container max-w-3xl mx-auto p-6">
+    <h2 class="text-lg font-bold mb-6" style="color:var(--w-muted); border-bottom:1px solid var(--w-border); padding-bottom:8px;">
+      결과 — 정삼각형 <span style="font-size:12px; font-weight:normal">(방향 고정: 꼭짓점 위↑)</span>
+    </h2>
+
+    <div class="flex flex-col items-center gap-5">
+
+      <div class="text-center">
+        <div class="text-base font-bold">Mouse Accuracy Test</div>
+      </div>
+
+      <div class="flex gap-2">
+        <button class="w-shape-btn">원</button>
+        <button class="w-shape-btn">정사각형</button>
+        <button class="w-shape-btn active">정삼각형</button>
+      </div>
+
+      <!-- Canvas: trajectory + ideal triangle overlay -->
+      <!-- Triangle center (200,215), circumradius 110 -->
+      <!-- Vertices: top(200,105), bottom-right(295,270), bottom-left(105,270) -->
+      <div class="w-canvas-wrap">
+        <svg viewBox="0 0 400 400" width="100%" height="100%">
+          <!-- Ideal equilateral triangle (dashed), vertex at top -->
+          <polygon points="200,105 295,270 105,270" class="w-ideal"/>
+
+          <!-- User trajectory: wobbly triangle with color segments -->
+          <!-- ok: top → bottom-right -->
+          <path d="M 202 96 Q 258 186 300 276" class="w-traj-ok"/>
+          <!-- warn: bottom edge -->
+          <path d="M 300 276 L 200 282 L 100 274" class="w-traj-warn"/>
+          <!-- err: bottom-left → top -->
+          <path d="M 100 274 Q 140 182 202 96" class="w-traj-err"/>
+
+          <!-- Center cross -->
+          <line x1="188" y1="215" x2="212" y2="215" class="w-center"/>
+          <line x1="200" y1="203" x2="200" y2="227" class="w-center"/>
+        </svg>
+      </div>
+
+      <div class="flex flex-col items-center gap-2">
+        <div class="w-accuracy-num">79.6%</div>
+        <div class="w-accuracy-label">정확도</div>
+      </div>
+
+      <button class="w-btn-primary">
+        <i data-lucide="refresh-cw" style="display:inline;width:13px;height:13px;vertical-align:middle;margin-right:4px;"></i>
+        다시 시도
+      </button>
+
+      <div class="flex gap-4 text-xs" style="color:var(--w-muted)">
+        <span><span class="w-legend-dot" style="background:#6aaa88"></span>정확</span>
+        <span><span class="w-legend-dot" style="background:#cc9944"></span>오차 작음</span>
+        <span><span class="w-legend-dot" style="background:#cc5555"></span>오차 큼</span>
+      </div>
+
+    </div>
+
+    <div class="screen-notes">
+      <details open>
+        <summary>Notes</summary>
+        <ul>
+          <li>트리거: 정삼각형 선택 후 mouseup 완료</li>
+          <li>이상적 정삼각형은 꼭짓점이 위(12시)를 향하는 방향으로 고정</li>
+          <li>인터랙션: 동일 (색상 궤적 + 오버레이 + % + 다시 시도)</li>
+        </ul>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── Screen 4: 너무 작음 ───────────────────────────────────── -->
+<div id="screen-4" class="screen" data-scenario="scenario-7">
+  <div class="screen-content @container max-w-3xl mx-auto p-6">
+    <h2 class="text-lg font-bold mb-6" style="color:var(--w-muted); border-bottom:1px solid var(--w-border); padding-bottom:8px;">
+      너무 작게 그린 경우
+    </h2>
+
+    <div class="flex flex-col items-center gap-5">
+
+      <div class="text-center">
+        <div class="text-base font-bold">Mouse Accuracy Test</div>
+      </div>
+
+      <div class="flex gap-2">
+        <button class="w-shape-btn active">원</button>
+        <button class="w-shape-btn">정사각형</button>
+        <button class="w-shape-btn">정삼각형</button>
+      </div>
+
+      <!-- Canvas: center point + tiny attempt (faded) -->
+      <div class="w-canvas-wrap">
+        <svg viewBox="0 0 400 400" width="100%" height="100%">
+          <!-- Tiny wobbly attempt near center (faded) -->
+          <circle cx="200" cy="200" r="7" stroke="#ddd" stroke-width="2" fill="none"/>
+          <!-- Center cross -->
+          <line x1="188" y1="200" x2="212" y2="200" class="w-center"/>
+          <line x1="200" y1="188" x2="200" y2="212" class="w-center"/>
+          <!-- Instruction text -->
+          <text x="200" y="246" text-anchor="middle" font-size="13" fill="#bbb" font-family="monospace">중심점 기준으로 도형을 그려주세요</text>
+        </svg>
+      </div>
+
+      <!-- Warning message -->
+      <div class="w-warning-msg">
+        너무 작습니다. 더 크게 그려주세요
+      </div>
+
+      <!-- No accuracy, no retry button — canvas auto-reset, ready to draw again -->
+      <div class="text-xs" style="color:var(--w-muted)">캔버스가 초기화되었습니다</div>
+
+    </div>
+
+    <div class="screen-notes">
+      <details open>
+        <summary>Notes</summary>
+        <ul>
+          <li>트리거: mouseup 시 그린 궤적의 기준 크기가 반지름 10px 미만</li>
+          <li>인터랙션: 경고 메시지 표시, 색상 오버레이·정확도 없음, 캔버스 자동 초기화</li>
+          <li>전환: 다음 mousedown으로 바로 다시 그리기 가능</li>
+        </ul>
+      </details>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var currentScreen = 0;
+var screenIds = [];
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById('screen-' + id).classList.add('active');
+  document.querySelectorAll('nav button[id^="nav-"]').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('nav-' + id).classList.add('active');
+  currentScreen = screenIds.indexOf(id);
+  lucide.createIcons();
+}
+
+function setViewport(mode) {
+  document.body.classList.remove('viewport-mobile', 'viewport-desktop');
+  document.body.classList.add('viewport-' + mode);
+  document.querySelectorAll('.vp-toggle button').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('vp-' + mode).classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('nav button[id^="nav-"]').forEach(function(b) {
+    screenIds.push(parseInt(b.id.replace('nav-', '')));
+  });
+  var first = document.querySelector('nav button[id^="nav-"]');
+  if (first) first.click();
+});
+</script>
+</body>
+</html>
